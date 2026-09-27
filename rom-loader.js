@@ -247,47 +247,35 @@ gameSearch.addEventListener(
    ========================================== */
 
 function stopGame() {
-
-    // Invalidate any emulator that is currently loading.
     gameLoadId++;
 
-    /*
-     * Tell EmulatorJS to exit normally.
-     *
-     * We deliberately do NOT remove its script,
-     * delete its globals, or modify its internals.
-     * EmulatorJS handles its own shutdown.
-     */
-    try {
+    // Find EmulatorJS's actual "Exit Emulation" button
+    const exitButton = document.querySelector(
+        '[data-id="exitEmulation"]'
+    );
 
-        if (
-            window.EJS_emulator &&
-            typeof window.EJS_emulator.exit === "function"
-        ) {
-            window.EJS_emulator.exit();
-        }
-
-    } catch (error) {
-
-        console.warn(
-            "EmulatorJS exit warning:",
-            error
-        );
+    if (exitButton) {
+        exitButton.click();
+        return;
     }
 
+    // Fallback in case the button uses a different attribute
+    const buttons = document.querySelectorAll("button");
 
-    /*
-     * Clear the game area after giving EmulatorJS
-     * a short moment to shut itself down.
-     */
-    setTimeout(() => {
+    for (const button of buttons) {
+        const text = button.textContent.trim().toLowerCase();
 
-        gameContainer.innerHTML = "";
+        if (
+            text === "exit emulation" ||
+            text === "exit"
+        ) {
+            button.click();
+            return;
+        }
+    }
 
-        gameLoading.style.display =
-            "none";
-
-    }, 300);
+    // If the emulator isn't running, just clear the container.
+    gameContainer.innerHTML = "";
 }
 
 
