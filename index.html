@@ -7,6 +7,7 @@
     <title>Retro NES Game Library</title>
     <link rel="icon" href="data:,">
 
+    <!-- JSNES -->
     <script src="https://unpkg.com/jsnes@2/dist/jsnes.min.js"></script>
 
     <style>
@@ -22,54 +23,121 @@
         }
 
         body {
-            background: #222;
+            background-color: #222;
             color: white;
             font-family: Arial, sans-serif;
             text-align: center;
         }
 
-        /* -------------------------
-           GAME LIST
-        ------------------------- */
+
+        /* =========================================
+           GAME LIST SCREEN
+        ========================================= */
 
         #game-list-screen {
-            padding: 30px 20px;
+            padding: 30px 20px 50px;
         }
 
         #game-list-screen h1 {
-            margin-top: 10px;
-            margin-bottom: 10px;
+            margin: 10px 0;
         }
+
+        #game-list-screen > p {
+            color: #bbb;
+        }
+
+
+        /* =========================================
+           SEARCH BAR
+        ========================================= */
+
+        #search-container {
+            width: min(90vw, 600px);
+            margin: 25px auto;
+        }
+
+        #game-search {
+            width: 100%;
+            padding: 13px 16px;
+
+            font-size: 16px;
+            font-family: Arial, sans-serif;
+
+            color: white;
+            background: #333;
+
+            border: 2px solid #555;
+            border-radius: 8px;
+
+            outline: none;
+        }
+
+        #game-search:focus {
+            border-color: #888;
+        }
+
+        #game-search::placeholder {
+            color: #aaa;
+        }
+
+
+        /* =========================================
+           GAME LIST
+        ========================================= */
 
         #game-list {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+
+            grid-template-columns:
+                repeat(auto-fill, minmax(180px, 1fr));
+
             gap: 20px;
+
             max-width: 1000px;
+
             margin: 30px auto;
         }
 
+
+        /* =========================================
+           GAME CARD
+        ========================================= */
+
         .game-card {
             background: #333;
+
             border: 2px solid #555;
             border-radius: 10px;
+
             padding: 15px;
+
             cursor: pointer;
-            transition: 0.15s;
+
+            transition:
+                background 0.15s,
+                border-color 0.15s,
+                transform 0.15s;
         }
 
         .game-card:hover {
             background: #444;
             border-color: #888;
+
             transform: translateY(-2px);
         }
 
         .game-card img {
+            display: block;
+
             width: 100%;
             height: 140px;
+
             object-fit: contain;
+
             background: #111;
+
             border-radius: 6px;
+
             margin-bottom: 10px;
         }
 
@@ -78,30 +146,50 @@
             font-size: 16px;
         }
 
-        /* -------------------------
+
+        /* =========================================
            GAME SCREEN
-        ------------------------- */
+        ========================================= */
 
         #game-screen {
-    display: none;
-    padding: 10px 10px 40px 10px;
-}   
+            display: none;
+
+            padding:
+                10px
+                10px
+                40px;
+        }
+
+
+        /* =========================================
+           GAME HEADER
+        ========================================= */
 
         #game-header {
             display: flex;
+
             align-items: center;
+
             gap: 10px;
-            max-width: 1000px;
-            margin: 0 auto 10px auto;
+
+            width: min(96vw, 768px);
+
+            margin:
+                0 auto
+                10px;
         }
 
         #back-button {
             background: #444;
             color: white;
+
             border: none;
             border-radius: 6px;
+
             padding: 10px 15px;
+
             font-size: 18px;
+
             cursor: pointer;
         }
 
@@ -111,62 +199,83 @@
 
         #game-title {
             flex: 1;
+
             margin: 0;
+
             font-size: 22px;
+
+            text-align: center;
         }
 
-        /* Emulator */
+
+        /* =========================================
+           NES EMULATOR
+        ========================================= */
 
         #nes-container {
-    margin: 10px auto;
-    border: 4px solid #444;
-    background: black;
+            width: min(90vw, 640px);
 
-    /* Comfortable size without taking over the page */
-    width: min(90vw, 640px);
+            aspect-ratio: 256 / 240;
 
-    /* Keeps the NES 256x240 aspect ratio */
-    aspect-ratio: 256 / 240;
+            margin: 10px auto;
 
-    overflow: hidden;
-}
+            background: black;
 
-#nes-container canvas {
-    width: 100% !important;
-    height: 100% !important;
+            border: 4px solid #444;
 
-    /* Keeps NES pixels sharp */
-    image-rendering: pixelated;
-}
+            overflow: hidden;
+        }
 
-        /* Loading message */
+        #nes-container canvas {
+            width: 100% !important;
+            height: 100% !important;
+
+            image-rendering: pixelated;
+        }
+
+
+        /* =========================================
+           LOADING MESSAGE
+        ========================================= */
 
         #game-loading {
             color: #aaa;
+
             margin: 15px;
         }
 
-        /* -------------------------
-           COLLAPSIBLE CONTROLS
-        ------------------------- */
+
+        /* =========================================
+           CONTROLS
+        ========================================= */
 
         #controls-details {
-            width: min(96vw, 768px);
-            margin: 15px auto 30px auto;
+            width: min(90vw, 640px);
+
+            margin: 20px auto 30px;
+
             background: #2d2d2d;
+
             border: 2px solid #444;
+
             border-radius: 8px;
+
             text-align: left;
+
             overflow: hidden;
         }
 
         #controls-details summary {
             cursor: pointer;
+
             padding: 14px 16px;
+
             font-size: 17px;
             font-weight: bold;
-            user-select: none;
+
             background: #333;
+
+            user-select: none;
         }
 
         #controls-details summary:hover {
@@ -174,17 +283,23 @@
         }
 
         #controls-content {
-            padding: 15px 18px 18px 18px;
+            padding: 15px 18px 18px;
+
             color: #ccc;
         }
 
         .control-row {
             display: flex;
+
             justify-content: space-between;
             align-items: center;
+
             gap: 20px;
+
             padding: 9px 0;
-            border-bottom: 1px solid #444;
+
+            border-bottom:
+                1px solid #444;
         }
 
         .control-row:last-child {
@@ -197,28 +312,50 @@
 
         .key {
             display: inline-block;
+
             min-width: 45px;
+
             padding: 5px 8px;
+
             background: #111;
+
             border: 1px solid #666;
+
             border-radius: 5px;
+
             color: white;
+
             font-family: monospace;
+
             text-align: center;
         }
 
         .mouse-section {
             margin-top: 20px;
+
+            padding-top: 10px;
+
+            border-top:
+                1px solid #444;
         }
 
         .mouse-section h3 {
             margin-bottom: 8px;
+
             color: white;
         }
 
+
+        /* =========================================
+           MOBILE
+        ========================================= */
+
         @media (max-width: 500px) {
+
             #game-list {
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns:
+                    repeat(2, 1fr);
+
                 gap: 10px;
             }
 
@@ -232,18 +369,26 @@
 
             .control-row {
                 flex-direction: column;
+
                 align-items: flex-start;
+
                 gap: 5px;
             }
+
+            #game-title {
+                font-size: 18px;
+            }
+
         }
     </style>
 </head>
 
 <body>
 
-    <!-- =========================
+
+    <!-- =========================================
          GAME LIST
-    ========================== -->
+    ========================================== -->
 
     <div id="game-list-screen">
 
@@ -251,40 +396,74 @@
 
         <p>Select a game to play.</p>
 
+
+        <!-- SEARCH -->
+
+        <div id="search-container">
+
+            <input
+                type="search"
+                id="game-search"
+                placeholder="Search games..."
+                aria-label="Search games"
+                autocomplete="off"
+            >
+
+        </div>
+
+
+        <!-- GAME CARDS -->
+
         <div id="game-list">
+
             <p>Loading games...</p>
+
         </div>
 
     </div>
 
 
-    <!-- =========================
+    <!-- =========================================
          GAME SCREEN
-    ========================== -->
+    ========================================== -->
 
     <div id="game-screen">
 
+
+        <!-- HEADER -->
+
         <div id="game-header">
 
-            <button id="back-button" aria-label="Back to game list">
+            <button
+                id="back-button"
+                type="button"
+                aria-label="Back to game list"
+            >
                 ← Back
             </button>
 
-            <h2 id="game-title">NES Game</h2>
+            <h2 id="game-title">
+                NES Game
+            </h2>
 
         </div>
 
 
+        <!-- EMULATOR -->
+
         <div id="nes-container"></div>
+
+
+        <!-- LOADING -->
 
         <div id="game-loading">
             Loading game...
         </div>
 
 
-        <!-- =========================
+        <!-- =====================================
              COLLAPSIBLE CONTROLS
-        ========================== -->
+        ====================================== -->
 
         <details id="controls-details">
 
@@ -292,61 +471,132 @@
                 🎮 Controls
             </summary>
 
+
             <div id="controls-content">
 
-                <div class="control-row">
-                    <span class="control-action">D-Pad Up</span>
-                    <span class="key">↑</span>
-                </div>
 
                 <div class="control-row">
-                    <span class="control-action">D-Pad Down</span>
-                    <span class="key">↓</span>
+
+                    <span class="control-action">
+                        D-Pad Up
+                    </span>
+
+                    <span class="key">
+                        ↑
+                    </span>
+
                 </div>
+
 
                 <div class="control-row">
-                    <span class="control-action">D-Pad Left</span>
-                    <span class="key">←</span>
+
+                    <span class="control-action">
+                        D-Pad Down
+                    </span>
+
+                    <span class="key">
+                        ↓
+                    </span>
+
                 </div>
+
 
                 <div class="control-row">
-                    <span class="control-action">D-Pad Right</span>
-                    <span class="key">→</span>
+
+                    <span class="control-action">
+                        D-Pad Left
+                    </span>
+
+                    <span class="key">
+                        ←
+                    </span>
+
                 </div>
+
 
                 <div class="control-row">
-                    <span class="control-action">A Button</span>
-                    <span class="key">X</span>
+
+                    <span class="control-action">
+                        D-Pad Right
+                    </span>
+
+                    <span class="key">
+                        →
+                    </span>
+
                 </div>
+
 
                 <div class="control-row">
-                    <span class="control-action">B Button</span>
-                    <span class="key">Z</span>
+
+                    <span class="control-action">
+                        A Button
+                    </span>
+
+                    <span class="key">
+                        X
+                    </span>
+
                 </div>
+
 
                 <div class="control-row">
-                    <span class="control-action">Start</span>
-                    <span class="key">Enter</span>
+
+                    <span class="control-action">
+                        B Button
+                    </span>
+
+                    <span class="key">
+                        Z
+                    </span>
+
                 </div>
+
 
                 <div class="control-row">
-                    <span class="control-action">Select</span>
-                    <span class="key">Shift</span>
+
+                    <span class="control-action">
+                        Start
+                    </span>
+
+                    <span class="key">
+                        Enter
+                    </span>
+
                 </div>
 
+
+                <div class="control-row">
+
+                    <span class="control-action">
+                        Select
+                    </span>
+
+                    <span class="key">
+                        Shift
+                    </span>
+
+                </div>
+
+
+                <!-- MOUSE -->
 
                 <div class="mouse-section">
-                    <h3>🖱️ Mouse</h3>
+
+                    <h3>
+                        🖱️ Mouse
+                    </h3>
 
                     <p>
-                        Click inside the game screen to focus the emulator
-                        before using the keyboard controls.
+                        Click inside the game screen to focus
+                        the emulator before using the keyboard.
                     </p>
 
                     <p>
-                        Mouse controls can also be added here later if you
-                        decide you want them.
+                        The mouse does not control the NES
+                        directly. It is used to focus the game.
                     </p>
+
                 </div>
 
             </div>
@@ -356,7 +606,8 @@
     </div>
 
 
-    <!-- Your game/ROM loader -->
+    <!-- ROM LOADER -->
+
     <script src="rom-loader.js"></script>
 
 </body>
