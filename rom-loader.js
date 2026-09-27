@@ -260,107 +260,53 @@ gameSearch.addEventListener(
    ========================================== */
 
 function stopGame() {
-
-    /*
-     * Invalidate any pending game load.
-     */
     gameLoadId++;
 
-
-    /*
-     * EmulatorJS exposes its player through
-     * EJS_emulator when it has initialized.
-     *
-     * Try its shutdown methods if available.
-     */
+    // Ask EmulatorJS to perform its normal Exit Emulation process.
     try {
+        if (window.EJS_emulator) {
+            const exitButton = document.querySelector(
+                ".ejs_menu_button_exit, [data-id='exit'], .ejs_exit"
+            );
 
-        if (
-            window.EJS_emulator &&
-            typeof window.EJS_emulator.exit === "function"
-        ) {
-
-            window.EJS_emulator.exit();
+            if (exitButton) {
+                exitButton.click();
+            }
         }
-
     } catch (error) {
-
-        console.warn(
-            "EmulatorJS exit warning:",
-            error
-        );
+        console.warn("Could not trigger EmulatorJS exit:", error);
     }
 
+    // Give EmulatorJS a moment to shut down its core/workers,
+    // then remove everything belonging to the emulator.
+    setTimeout(() => {
+        gameContainer.innerHTML = "";
 
-    try {
+        document
+            .querySelectorAll('script[data-emulatorjs-loader="true"]')
+            .forEach(script => script.remove());
 
-        if (
-            window.EJS_emulator &&
-            typeof window.EJS_emulator.stop === "function"
-        ) {
+        // Remove EmulatorJS-generated elements outside #game too.
+        document
+            .querySelectorAll(
+                "#game canvas, #game iframe, #game > *, .ejs_menu, .ejs_controls"
+            )
+            .forEach(element => element.remove());
 
-            window.EJS_emulator.stop();
-        }
+        gameLoading.style.display = "none";
 
-    } catch (error) {
-
-        console.warn(
-            "EmulatorJS stop warning:",
-            error
-        );
-    }
-
-
-    /*
-     * Remove the emulator DOM.
-     */
-    gameContainer.innerHTML = "";
-
-
-    /*
-     * Remove dynamically loaded EmulatorJS
-     * script.
-     */
-    document
-        .querySelectorAll(
-            'script[data-emulatorjs-loader="true"]'
-        )
-        .forEach(script => {
-            script.remove();
-        });
-
-
-    /*
-     * Clear EmulatorJS globals.
-     */
-    try {
-
-        delete window.EJS_player;
-        delete window.EJS_gameName;
-        delete window.EJS_gameUrl;
-        delete window.EJS_core;
-        delete window.EJS_biosUrl;
-        delete window.EJS_pathtodata;
-        delete window.EJS_startOnLoaded;
-        delete window.EJS_askBeforeExit;
-        delete window.EJS_onExit;
-
-    } catch (error) {
-
-        console.warn(
-            "Could not clear EmulatorJS settings:",
-            error
-        );
-    }
-
-
-    /*
-     * Reset the loading message.
-     */
-    gameLoading.style.display =
-        "none";
+        // Clear configuration for the next game.
+        window.EJS_player = undefined;
+        window.EJS_gameName = undefined;
+        window.EJS_gameUrl = undefined;
+        window.EJS_core = undefined;
+        window.EJS_biosUrl = undefined;
+        window.EJS_pathtodata = undefined;
+        window.EJS_startOnLoaded = undefined;
+        window.EJS_askBeforeExit = undefined;
+        window.EJS_onExit = undefined;
+    }, 100);
 }
-
 
 /* ==========================================
    START GAME
@@ -532,40 +478,20 @@ function loadEmulator(
    BACK BUTTON
    ========================================== */
 
-backButton.addEventListener(
-    "click",
-    () => {
+backButton.addEventListener("click", () => {
+    stopGame();
 
-        /*
-         * Actually stop the emulator first.
-         */
-        stopGame();
+    gameScreen.style.display = "none";
+    gameListScreen.style.display = "block";
 
+    gameSearch.value = "";
+    displayGames(allGames);
 
-        /*
-         * Return to library.
-         */
-        gameScreen.style.display =
-            "none";
-
-        gameListScreen.style.display =
-            "block";
-
-
-        /*
-         * Reset search.
-         */
-        gameSearch.value = "";
-
-        displayGames(allGames);
-
-
-        window.scrollTo({
-            top: 0,
-            behavior: "smooth"
-        });
-    }
-);
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+});
 
 
 /* ==========================================
