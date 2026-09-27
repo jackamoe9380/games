@@ -31,6 +31,13 @@ const gameLoading = document.getElementById("game-loading");
 
 
 /* =========================================
+   CURRENT EMULATOR
+========================================= */
+
+let nesBrowserPlayer = null;
+
+
+/* =========================================
    GET GITHUB REPOSITORY INFORMATION
 ========================================= */
 
@@ -133,9 +140,7 @@ function createGameCard(game) {
     const name = makeGameName(game.name);
 
 
-    /* -------------------------
-       GAME IMAGE
-    ------------------------- */
+    /* Game image */
 
     const imageName =
         game.name.replace(/\.nes$/i, ".png");
@@ -154,9 +159,7 @@ function createGameCard(game) {
     };
 
 
-    /* -------------------------
-       GAME NAME
-    ------------------------- */
+    /* Game name */
 
     const title = document.createElement("div");
 
@@ -165,17 +168,13 @@ function createGameCard(game) {
     title.textContent = name;
 
 
-    /* -------------------------
-       BUILD CARD
-    ------------------------- */
+    /* Build card */
 
     card.appendChild(image);
     card.appendChild(title);
 
 
-    /* -------------------------
-       START GAME
-    ------------------------- */
+    /* Start game */
 
     card.addEventListener("click", function () {
 
@@ -189,27 +188,80 @@ function createGameCard(game) {
 
 
 /* =========================================
+   STOP CURRENT GAME
+========================================= */
+
+function stopGame() {
+
+    /*
+     * Try to properly stop JSNES.
+     *
+     * Different JSNES versions expose slightly
+     * different cleanup methods, so check for them.
+     */
+
+    if (nesBrowserPlayer) {
+
+        try {
+
+            if (typeof nesBrowserPlayer.destroy === "function") {
+
+                nesBrowserPlayer.destroy();
+
+            }
+
+        } catch (error) {
+
+            console.log(
+                "Could not destroy emulator:",
+                error
+            );
+
+        }
+
+        nesBrowserPlayer = null;
+
+    }
+
+
+    /*
+     * Completely remove the emulator's canvas
+     * and anything else it created.
+     */
+
+    nesContainer.innerHTML = "";
+
+}
+
+
+/* =========================================
    START A GAME
 ========================================= */
 
 async function startGame(romURL, name) {
 
-    /* Switch to game screen */
+    /* Stop anything that might already be running */
+
+    stopGame();
+
+
+    /* Switch screens */
 
     gameListScreen.style.display = "none";
 
     gameScreen.style.display = "block";
 
+
+    /* Set title */
+
     gameTitle.textContent = name;
+
+
+    /* Show loading */
 
     gameLoading.style.display = "block";
 
     gameLoading.textContent = "Loading game...";
-
-
-    /* Remove previous emulator */
-
-    nesContainer.innerHTML = "";
 
 
     try {
@@ -217,9 +269,7 @@ async function startGame(romURL, name) {
         console.log("Loading:", romURL);
 
 
-        /* -------------------------
-           DOWNLOAD ROM
-        ------------------------- */
+        /* Download ROM */
 
         const response = await fetch(romURL);
 
@@ -232,13 +282,13 @@ async function startGame(romURL, name) {
         }
 
 
-        /* -------------------------
-           CONVERT ROM
-        ------------------------- */
+        /* Convert ROM */
 
-        const buffer = await response.arrayBuffer();
+        const buffer =
+            await response.arrayBuffer();
 
-        const romBytes = new Uint8Array(buffer);
+        const romBytes =
+            new Uint8Array(buffer);
 
         let romBinaryString = "";
 
@@ -251,11 +301,9 @@ async function startGame(romURL, name) {
         }
 
 
-        /* -------------------------
-           START JSNES
-        ------------------------- */
+        /* Start JSNES */
 
-        window.nesBrowserPlayer = new jsnes.Browser({
+        nesBrowserPlayer = new jsnes.Browser({
 
             container: nesContainer,
 
@@ -273,25 +321,16 @@ async function startGame(romURL, name) {
         );
 
 
-        /* -------------------------
-           TRY FULLSCREEN
-        ------------------------- */
+        /*
+         * Scroll to the top of the game screen.
+         *
+         * This does NOT enter fullscreen.
+         */
 
-        try {
-
-            if (gameScreen.requestFullscreen) {
-
-                await gameScreen.requestFullscreen();
-
-            }
-
-        } catch (fullscreenError) {
-
-            console.log(
-                "Browser fullscreen was not available."
-            );
-
-        }
+        window.scrollTo({
+            top: 0,
+            behavior: "smooth"
+        });
 
     } catch (error) {
 
@@ -325,35 +364,41 @@ async function startGame(romURL, name) {
 
 backButton.addEventListener("click", function () {
 
+    /*
+     * Stop the emulator first.
+     */
 
-    /* Leave fullscreen */
-
-    if (document.fullscreenElement) {
-
-        document.exitFullscreen().catch(() => {});
-
-    }
+    stopGame();
 
 
-    /* Remove emulator */
-
-    nesContainer.innerHTML = "";
-
-
-    /* Return to game list */
+    /*
+     * Return to game list.
+     */
 
     gameScreen.style.display = "none";
 
     gameListScreen.style.display = "block";
 
+
+    /*
+     * Clear game information.
+     */
+
     gameTitle.textContent = "";
-
-
-    /* Reset loading text */
 
     gameLoading.style.display = "block";
 
     gameLoading.textContent = "Loading game...";
+
+
+    /*
+     * Return to the top of the game list.
+     */
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
 
 });
 
@@ -369,24 +414,27 @@ async function loadGameList() {
         const games = await findGames();
 
 
-        /* Remove loading message */
+        /* Clear loading message */
 
         gameList.innerHTML = "";
 
 
-        /* No games found */
+        /* No games */
 
         if (games.length === 0) {
 
             gameList.innerHTML =
-                `<p>No .nes files were found in the "${ROM_FOLDER}" folder.</p>`;
+                `<p>
+                    No .nes files were found in the
+                    "${ROM_FOLDER}" folder.
+                </p>`;
 
             return;
 
         }
 
 
-        /* Create a card for every game */
+        /* Create cards */
 
         for (const game of games) {
 
@@ -405,7 +453,6 @@ async function loadGameList() {
     } catch (error) {
 
         console.error(error);
-
 
         gameList.innerHTML =
             `<p>
