@@ -1,756 +1,669 @@
+"use strict";
+
 /*
- * AUTOMATIC NES GAME LIBRARY
- *
- * Looks through the /games folder on GitHub,
- * finds every .nes file, and creates the game list.
- *
- * Features:
- * - Automatic game discovery
- * - Game search
- * - Optional game artwork
- * - NES emulator
- * - Back button
- * - Proper emulator cleanup
+ * ==========================================
+ * NES GAME LIBRARY
+ * EmulatorJS + Nestopia
+ * ==========================================
  */
 
-
-/* =========================================
-   SETTINGS
-========================================= */
-
 const ROM_FOLDER = "games";
-
 const IMAGE_FOLDER = "images";
 
+/*
+ * EmulatorJS files.
 
-/* =========================================
+ * We use the stable EmulatorJS CDN rather than
+ * putting the emulator's large WASM files in
+ * your GitHub repository.
+ */
+const EMULATOR_DATA_PATH =
+    "https://cdn.emulatorjs.org/stable/data/";
+
+
+/* ==========================================
    PAGE ELEMENTS
-========================================= */
+   ========================================== */
 
-const gameListScreen =
-    document.getElementById("game-list-screen");
+const gameListScreen = document.getElementById("game-list-screen");
+const gameScreen = document.getElementById("game-screen");
 
-const gameList =
-    document.getElementById("game-list");
+const gameList = document.getElementById("game-list");
+const gameStatus = document.getElementById("game-status");
 
-const gameSearch =
-    document.getElementById("game-search");
+const gameSearch = document.getElementById("game-search");
 
-const gameScreen =
-    document.getElementById("game-screen");
+const backButton = document.getElementById("back-button");
+const gameTitle = document.getElementById("game-title");
 
-const nesContainer =
-    document.getElementById("nes-container");
-
-const backButton =
-    document.getElementById("back-button");
-
-const gameTitle =
-    document.getElementById("game-title");
-
-const gameLoading =
-    document.getElementById("game-loading");
+const nesContainer = document.getElementById("nes-container");
+const gameContainer = document.getElementById("game");
+const gameLoading = document.getElementById("game-loading");
 
 
-/* =========================================
-   CURRENT EMULATOR
-========================================= */
-
-let nesBrowserPlayer = null;
-
-
-/* =========================================
-   ALL GAMES
-========================================= */
+/* ==========================================
+   GAME DATA
+   ========================================== */
 
 let allGames = [];
 
+/*
+ * Every time a game starts/stops this number
+ * increases.
 
-/* =========================================
-   GET GITHUB REPOSITORY
-========================================= */
+ * This prevents an old asynchronous emulator
+ * load from appearing after the user has already
+ * gone back or selected another game.
+ */
+let gameLoadId = 0;
+
+
+/* ==========================================
+   GITHUB REPOSITORY INFORMATION
+   ========================================== */
 
 function getRepositoryInfo() {
 
-    const host =
-        window.location.hostname;
+    const hostname = window.location.hostname;
+    const pathname = window.location.pathname;
 
+    /*
+     * GitHub Pages normally looks like:
 
-    if (!host.endsWith(".github.io")) {
+     * username.github.io/repository/
+     *
+     * or:
+     *
+     * username.github.io/
+     */
 
+    if (!hostname.endsWith(".github.io")) {
         throw new Error(
-            "This automatic folder scanner is designed for GitHub Pages."
+            "This game library must be hosted on GitHub Pages."
         );
-
     }
 
+    const username = hostname.split(".")[0];
 
-    const username =
-        host.split(".")[0];
+    const pathParts = pathname
+        .split("/")
+        .filter(Boolean);
 
-
-    const pathParts =
-        window.location.pathname
-            .split("/")
-            .filter(part => part.length > 0);
-
-
-    let repository;
-
-
-    if (pathParts.length > 0) {
-
-        repository =
-            pathParts[0];
-
-    } else {
-
-        repository =
-            username + ".github.io";
-
-    }
-
+    /*
+     * If the site is a project page, the first
+     * path component is the repository name.
+     */
+    const repository =
+        pathParts.length > 0
+            ? pathParts[0]
+            : `${username}.github.io`;
 
     return {
-        username: username,
-        repository: repository
+        username,
+        repository
     };
-
 }
 
 
-/* =========================================
-   MAKE GAME NAME
-========================================= */
+/* ==========================================
+   GAME NAME
+   ========================================== */
 
 function makeGameName(filename) {
 
-    /*
-     * Remove .nes
-     */
-
-    let name =
-        filename.replace(/\.nes$/i, "");
-
-
-    /*
-     * Replace underscores
-     */
-
-    name =
-        name.replace(/_/g, " ");
-
-
-    /*
-     * Uppercase
-     */
-
-    name =
-        name.toUpperCase();
-
-
-    return name;
-
+    return filename
+        .replace(/\.nes$/i, "")
+        .replace(/_/g, " ")
+        .replace(/-/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toUpperCase();
 }
 
 
-/* =========================================
+/* ==========================================
+   IMAGE URL
+   ========================================== */
+
+function getImageURL(filename) {
+
+    const baseName = filename.replace(/\.nes$/i, "");
+
+    /*
+     * GitHub Pages paths are case-sensitive.
+     * We use the same filename as the ROM.
+     */
+    return `${IMAGE_FOLDER}/${encodeURIComponent(baseName)}.png`;
+}
+
+
+/* ==========================================
    FIND GAMES
-========================================= */
+   ========================================== */
 
 async function findGames() {
 
-    const repo =
+    const { username, repository } =
         getRepositoryInfo();
 
-
     const apiURL =
-        `https://api.github.com/repos/${repo.username}/${repo.repository}/contents/${ROM_FOLDER}`;
+        `https://api.github.com/repos/${encodeURIComponent(username)}/${encodeURIComponent(repository)}/contents/${encodeURIComponent(ROM_FOLDER)}`;
 
-
-    const response =
-        await fetch(apiURL);
-
+    const response = await fetch(apiURL, {
+        headers: {
+            "Accept": "application/vnd.github+json"
+        }
+    });
 
     if (!response.ok) {
 
         throw new Error(
-            `Could not read the "${ROM_FOLDER}" folder. ` +
-            `GitHub returned status ${response.status}.`
+            `GitHub API returned ${response.status}`
         );
-
     }
 
+    const files = await response.json();
 
-    const files =
-        await response.json();
-
-
-    const games =
-        files
-            .filter(file =>
-                file.type === "file" &&
-                file.name
-                    .toLowerCase()
-                    .endsWith(".nes")
-            )
-            .sort((a, b) =>
-                a.name.localeCompare(b.name)
-            );
-
-
-    return games;
-
+    return files
+        .filter(file =>
+            file.type === "file" &&
+            file.name.toLowerCase().endsWith(".nes")
+        )
+        .map(file => ({
+            filename: file.name,
+            name: makeGameName(file.name),
+            romURL: file.download_url,
+            imageURL: getImageURL(file.name)
+        }))
+        .sort((a, b) =>
+            a.name.localeCompare(b.name)
+        );
 }
 
 
-/* =========================================
+/* ==========================================
    CREATE GAME CARD
-========================================= */
+   ========================================== */
 
 function createGameCard(game) {
 
-    const card =
-        document.createElement("div");
+    const card = document.createElement("div");
 
+    card.className = "game-card";
 
-    card.className =
-        "game-card";
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
 
+    const image = document.createElement("img");
 
-    const name =
-        makeGameName(game.name);
+    image.className = "game-image";
 
+    image.alt = game.name;
 
-    /* =====================================
-       IMAGE
-    ====================================== */
+    image.loading = "lazy";
 
-    const imageName =
-        game.name.replace(
-            /\.nes$/i,
-            ".png"
-        );
-
-
-    const image =
-        document.createElement("img");
-
-
-    image.src =
-        `${IMAGE_FOLDER}/${imageName}`;
-
-
-    image.alt =
-        name;
-
+    image.src = game.imageURL;
 
     /*
-     * Hide image if it doesn't exist.
+     * If no picture exists, hide the broken image
+     * instead of showing the browser's broken-image
+     * icon.
      */
-
-    image.onerror =
-        function () {
-
-            image.style.display =
-                "none";
-
-        };
+    image.onerror = function () {
+        this.style.display = "none";
+    };
 
 
-    /* =====================================
-       NAME
-    ====================================== */
+    const name = document.createElement("div");
 
-    const title =
-        document.createElement("div");
+    name.className = "game-name";
 
+    name.textContent = game.name;
 
-    title.className =
-        "game-name";
-
-
-    title.textContent =
-        name;
-
-
-    /* =====================================
-       BUILD CARD
-    ====================================== */
 
     card.appendChild(image);
+    card.appendChild(name);
 
-    card.appendChild(title);
+
+    card.addEventListener("click", () => {
+        startGame(game);
+    });
 
 
-    /* =====================================
-       CLICK
-    ====================================== */
+    card.addEventListener("keydown", event => {
 
-    card.addEventListener(
-        "click",
-        function () {
+        if (
+            event.key === "Enter" ||
+            event.key === " "
+        ) {
 
-            startGame(
-                game.download_url,
-                name
-            );
+            event.preventDefault();
 
+            startGame(game);
         }
-    );
+    });
 
 
     return card;
-
 }
 
 
-/* =========================================
+/* ==========================================
    DISPLAY GAMES
-========================================= */
+   ========================================== */
 
 function displayGames(games) {
 
-    /*
-     * Clear current cards.
-     */
-
     gameList.innerHTML = "";
-
-
-    /*
-     * No results.
-     */
 
     if (games.length === 0) {
 
-        const message =
-            document.createElement("p");
+        const noResults =
+            document.createElement("div");
 
+        noResults.className = "no-results";
 
-        message.id =
-            "no-search-results";
-
-
-        message.textContent =
+        noResults.textContent =
             "No games found.";
 
+        gameList.appendChild(noResults);
 
-        gameList.appendChild(message);
-
+        gameStatus.style.display = "none";
 
         return;
-
     }
 
+    gameStatus.style.display = "none";
 
-    /*
-     * Create cards.
-     */
+    const fragment =
+        document.createDocumentFragment();
 
-    for (const game of games) {
+    games.forEach(game => {
 
-        const card =
-            createGameCard(game);
+        fragment.appendChild(
+            createGameCard(game)
+        );
 
+    });
 
-        gameList.appendChild(card);
-
-    }
-
+    gameList.appendChild(fragment);
 }
 
 
-/* =========================================
-   SEARCH GAMES
-========================================= */
+/* ==========================================
+   SEARCH
+   ========================================== */
 
-gameSearch.addEventListener(
-    "input",
-    function () {
+gameSearch.addEventListener("input", () => {
 
-        const searchText =
-            gameSearch.value
-                .trim()
-                .toUpperCase();
+    const search =
+        gameSearch.value
+            .trim()
+            .toUpperCase();
 
+    if (!search) {
 
-        /*
-         * Filter the complete game list.
-         */
+        displayGames(allGames);
 
-        const filteredGames =
-            allGames.filter(game => {
+        return;
+    }
 
-                const name =
-                    makeGameName(
-                        game.name
-                    );
-
-
-                return name.includes(
-                    searchText
-                );
-
-            });
-
-
-        displayGames(
-            filteredGames
+    const filtered =
+        allGames.filter(game =>
+            game.name.includes(search)
         );
 
-    }
-);
+    displayGames(filtered);
+});
 
 
-/* =========================================
-   STOP GAME
-========================================= */
+/* ==========================================
+   REMOVE OLD EMULATOR
+   ========================================== */
 
 function stopGame() {
 
     /*
-     * If an emulator exists,
-     * try to destroy it.
+     * Invalidate any previous asynchronous load.
      */
-
-    if (nesBrowserPlayer) {
-
-        try {
-
-            if (
-                typeof nesBrowserPlayer.destroy ===
-                "function"
-            ) {
-
-                nesBrowserPlayer.destroy();
-
-            }
-
-        } catch (error) {
-
-            console.log(
-                "Could not destroy emulator:",
-                error
-            );
-
-        }
-
-
-        nesBrowserPlayer =
-            null;
-
-    }
+    gameLoadId++;
 
 
     /*
-     * Completely remove the
-     * emulator canvas.
+     * Remove the EmulatorJS-created DOM.
      */
+    gameContainer.innerHTML = "";
 
-    nesContainer.innerHTML =
-        "";
 
+    /*
+     * Remove any emulator scripts that we
+     * dynamically added.
+     */
+    document
+        .querySelectorAll(
+            'script[data-emulatorjs-loader="true"]'
+        )
+        .forEach(script => {
+            script.remove();
+        });
+
+
+    /*
+     * Remove old emulator-generated elements
+     * that may have been attached outside #game.
+     */
+    document
+        .querySelectorAll(
+            '[data-emulatorjs-created="true"]'
+        )
+        .forEach(element => {
+            element.remove();
+        });
+
+
+    /*
+     * Clear EmulatorJS global variables.
+     */
+    window.EJS_player = undefined;
+    window.EJS_gameUrl = undefined;
+    window.EJS_gameName = undefined;
+    window.EJS_core = undefined;
+    window.EJS_biosUrl = undefined;
+    window.EJS_pathtodata = undefined;
+    window.EJS_startOnLoaded = undefined;
+    window.EJS_askBeforeExit = undefined;
+    window.EJS_onExit = undefined;
+
+
+    /*
+     * Hide the loading message.
+     */
+    gameLoading.style.display = "none";
 }
 
 
-/* =========================================
+/* ==========================================
    START GAME
-========================================= */
+   ========================================== */
 
-async function startGame(
-    romURL,
-    name
-) {
+function startGame(game) {
 
     /*
-     * Stop any existing emulator.
+     * Stop anything that was previously running.
      */
+    stopGame();
+
+
+    /*
+     * Create a unique ID for this load.
+     */
+    const thisLoadId = gameLoadId;
+
+
+    /*
+     * Show game screen.
+     */
+    gameListScreen.style.display = "none";
+    gameScreen.style.display = "block";
+
+
+    /*
+     * Update title.
+     */
+    gameTitle.textContent = game.name;
+
+
+    /*
+     * Show loading message.
+     */
+    gameLoading.textContent =
+        `Loading ${game.name}...`;
+
+    gameLoading.style.display = "flex";
+
+
+    /*
+     * Scroll to the emulator.
+     */
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+
+
+    /*
+     * Give the browser a moment to display the
+     * game screen before loading the emulator.
+     */
+    setTimeout(() => {
+
+        /*
+         * User may have pressed Back while the
+         * timeout was waiting.
+         */
+        if (thisLoadId !== gameLoadId) {
+            return;
+        }
+
+
+        loadEmulator(game, thisLoadId);
+
+    }, 50);
+}
+
+
+/* ==========================================
+   LOAD EMULATORJS
+   ========================================== */
+
+function loadEmulator(game, thisLoadId) {
+
+    /*
+     * EmulatorJS settings.
+
+     * These globals must exist BEFORE loader.js
+     * is inserted into the page.
+     */
+
+    window.EJS_player = "#game";
+
+    window.EJS_gameName =
+        game.name;
+
+    window.EJS_gameUrl =
+        game.romURL;
+
+    /*
+     * IMPORTANT:
+     *
+     * "nestopia" selects the Nestopia NES core.
+     *
+     * Do NOT change this to "nes" if you specifically
+     * want Nestopia.
+     */
+    window.EJS_core = "nestopia";
+
+    window.EJS_biosUrl = "";
+
+    window.EJS_pathtodata =
+        EMULATOR_DATA_PATH;
+
+    /*
+     * Start automatically once the core and ROM
+     * have loaded.
+     */
+    window.EJS_startOnLoaded = true;
+
+    /*
+     * Don't ask for confirmation when leaving
+     * the emulator.
+     */
+    window.EJS_askBeforeExit = false;
+
+
+    /*
+     * EmulatorJS calls this when its emulator exits.
+     */
+    window.EJS_onExit = function () {
+
+        if (thisLoadId !== gameLoadId) {
+            return;
+        }
+
+        gameContainer.innerHTML = "";
+
+        gameLoading.textContent =
+            "Game closed.";
+
+        gameLoading.style.display = "flex";
+    };
+
+
+    /*
+     * Create the EmulatorJS loader script.
+     */
+    const script =
+        document.createElement("script");
+
+    script.src =
+        `${EMULATOR_DATA_PATH}loader.js`;
+
+    script.async = true;
+
+    script.dataset.emulatorjsLoader =
+        "true";
+
+
+    /*
+     * If the loader itself fails, give a useful
+     * error rather than leaving a blank screen.
+     */
+    script.onerror = function () {
+
+        if (thisLoadId !== gameLoadId) {
+            return;
+        }
+
+        gameLoading.textContent =
+            "EmulatorJS could not be loaded. Check your internet connection or try again.";
+
+        gameLoading.style.display = "flex";
+
+        console.error(
+            "Could not load EmulatorJS:",
+            script.src
+        );
+    };
+
+
+    /*
+     * Once the script has loaded, the emulator
+     * normally creates its own interface.
+     */
+    script.onload = function () {
+
+        if (thisLoadId !== gameLoadId) {
+            return;
+        }
+
+        /*
+         * Give EmulatorJS a moment to initialize
+         * before removing our loading overlay.
+         */
+        setTimeout(() => {
+
+            if (thisLoadId !== gameLoadId) {
+                return;
+            }
+
+            gameLoading.style.display = "none";
+
+        }, 1000);
+    };
+
+
+    document.body.appendChild(script);
+}
+
+
+/* ==========================================
+   BACK BUTTON
+   ========================================== */
+
+backButton.addEventListener("click", () => {
 
     stopGame();
 
 
     /*
-     * Switch screens.
+     * Switch back to game list.
      */
-
-    gameListScreen.style.display =
-        "none";
-
-    gameScreen.style.display =
-        "block";
+    gameScreen.style.display = "none";
+    gameListScreen.style.display = "block";
 
 
     /*
-     * Set title.
+     * Clear search so the full library is shown.
      */
+    gameSearch.value = "";
 
-    gameTitle.textContent =
-        name;
+    displayGames(allGames);
 
 
     /*
-     * Show loading.
+     * Return to the top of the library.
      */
-
-    gameLoading.style.display =
-        "block";
-
-    gameLoading.textContent =
-        "Loading game...";
-
-
-    try {
-
-        console.log(
-            "Loading:",
-            romURL
-        );
-
-
-        /* =================================
-           DOWNLOAD ROM
-        ================================== */
-
-        const response =
-            await fetch(romURL);
-
-
-        if (!response.ok) {
-
-            throw new Error(
-                `Could not download ROM. HTTP ${response.status}`
-            );
-
-        }
-
-
-        /* =================================
-           CONVERT ROM
-        ================================== */
-
-        const buffer =
-            await response.arrayBuffer();
-
-
-        const romBytes =
-            new Uint8Array(buffer);
-
-
-        let romBinaryString =
-            "";
-
-
-        for (
-            let i = 0;
-            i < romBytes.length;
-            i++
-        ) {
-
-            romBinaryString +=
-                String.fromCharCode(
-                    romBytes[i]
-                );
-
-        }
-
-
-        /* =================================
-           START JSNES
-        ================================== */
-
-        nesBrowserPlayer =
-            new jsnes.Browser({
-
-                container:
-                    nesContainer,
-
-                romData:
-                    romBinaryString
-
-            });
-
-
-        /* =================================
-           FINISHED
-        ================================== */
-
-        gameLoading.style.display =
-            "none";
-
-
-        console.log(
-            `${name} successfully loaded.`
-        );
-
-
-        /*
-         * Make sure the user starts
-         * at the top of the game page.
-         *
-         * NO automatic fullscreen.
-         */
-
-        window.scrollTo({
-            top: 0,
-            behavior: "smooth"
-        });
-
-
-    } catch (error) {
-
-        console.error(
-            "Emulator Boot Failure:",
-            error
-        );
-
-
-        gameLoading.style.display =
-            "block";
-
-
-        gameLoading.textContent =
-            "FAILED TO LOAD GAME";
-
-
-        alert(
-            "Failed to load " +
-            name +
-            ":\n\n" +
-            error.message
-        );
-
-    }
-
-}
-
-
-/* =========================================
-   BACK BUTTON
-========================================= */
-
-backButton.addEventListener(
-    "click",
-    function () {
-
-        /*
-         * Stop emulator.
-         */
-
-        stopGame();
-
-
-        /*
-         * Return to game list.
-         */
-
-        gameScreen.style.display =
-            "none";
-
-        gameListScreen.style.display =
-            "block";
-
-
-        /*
-         * Clear game title.
-         */
-
-        gameTitle.textContent =
-            "";
-
-
-        /*
-         * Reset loading message.
-         */
-
-        gameLoading.style.display =
-            "block";
-
-        gameLoading.textContent =
-            "Loading game...";
-
-
-        /*
-         * Clear search.
-         *
-         * Remove these three lines if you
-         * want the search to remain active
-         * after returning.
-         */
-
-        gameSearch.value =
-            "";
-
-
-        displayGames(
-            allGames
-        );
-
-
-        /*
-         * Go to top of library.
-         */
-
-        window.scrollTo({
-            top: 0,
-            behavior: "smooth"
-        });
-
-    }
-);
-
-
-/* =========================================
-   LOAD GAME LIST
-========================================= */
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+});
+
+
+/* ==========================================
+   INITIAL LOAD
+   ========================================== */
 
 async function loadGameList() {
 
     try {
 
-        /*
-         * Find all games.
-         */
+        gameStatus.textContent =
+            "Loading games...";
 
-        allGames =
-            await findGames();
-
-
-        /*
-         * Display them.
-         */
-
-        displayGames(
-            allGames
-        );
+        gameStatus.style.display =
+            "block";
 
 
-        console.log(
-            `Found ${allGames.length} NES games.`
-        );
+        allGames = await findGames();
 
+
+        if (allGames.length === 0) {
+
+            gameStatus.textContent =
+                "No .nes games were found in the games folder.";
+
+            return;
+        }
+
+
+        displayGames(allGames);
 
     } catch (error) {
 
         console.error(
+            "Could not load game list:",
             error
         );
 
+        gameStatus.innerHTML =
+            `Could not load the game list.<br><br>
+             <small>${error.message}</small>`;
 
-        gameList.innerHTML =
-            `<p>
-                Could not load the game list.
-                <br><br>
-                ${error.message}
-            </p>`;
-
+        gameStatus.style.display =
+            "block";
     }
-
 }
 
-
-/* =========================================
-   START
-========================================= */
 
 loadGameList();
