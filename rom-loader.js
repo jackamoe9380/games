@@ -1,86 +1,47 @@
 "use strict";
 
-/*
- * ==========================================
- * NES GAME LIBRARY
- * EmulatorJS + Nestopia
- * ==========================================
- */
-
 const ROM_FOLDER = "games";
 const IMAGE_FOLDER = "images";
 
 const EMULATOR_DATA_PATH =
     "https://cdn.emulatorjs.org/stable/data/";
 
+const gameListScreen = document.getElementById("game-list-screen");
+const gameScreen = document.getElementById("game-screen");
+const gameList = document.getElementById("game-list");
+const gameStatus = document.getElementById("game-status");
+const gameSearch = document.getElementById("game-search");
+const backButton = document.getElementById("back-button");
+const gameTitle = document.getElementById("game-title");
 
-/* ==========================================
-   PAGE ELEMENTS
-   ========================================== */
-
-const gameListScreen =
-    document.getElementById("game-list-screen");
-
-const gameScreen =
-    document.getElementById("game-screen");
-
-const gameList =
-    document.getElementById("game-list");
-
-const gameStatus =
-    document.getElementById("game-status");
-
-const gameSearch =
-    document.getElementById("game-search");
-
-const backButton =
-    document.getElementById("back-button");
-
-const gameTitle =
-    document.getElementById("game-title");
-
-const emulatorFrame =
-    document.getElementById("emulator-frame");
-
-const gameLoading =
-    document.getElementById("game-loading");
-
-
-/* ==========================================
-   GAME DATA
-   ========================================== */
+const nesContainer = document.getElementById("nes-container");
+const gameContainer = document.getElementById("game");
+const gameLoading = document.getElementById("game-loading");
 
 let allGames = [];
-
 let gameLoadId = 0;
 
 
 /* ==========================================
-   GITHUB INFORMATION
+   GITHUB REPOSITORY
    ========================================== */
 
 function getRepositoryInfo() {
 
-    const hostname =
-        window.location.hostname;
-
-    const pathname =
-        window.location.pathname;
+    const hostname = window.location.hostname;
+    const pathname = window.location.pathname;
 
     if (!hostname.endsWith(".github.io")) {
-
         throw new Error(
             "This game library must be hosted on GitHub Pages."
         );
     }
 
-    const username =
-        hostname.split(".")[0];
+    const username = hostname.split(".")[0];
 
-    const pathParts =
-        pathname
-            .split("/")
-            .filter(Boolean);
+    const pathParts = pathname
+        .split("/")
+        .filter(Boolean);
 
     const repository =
         pathParts.length > 0
@@ -137,30 +98,25 @@ async function findGames() {
     const apiURL =
         `https://api.github.com/repos/${encodeURIComponent(username)}/${encodeURIComponent(repository)}/contents/${encodeURIComponent(ROM_FOLDER)}`;
 
-    const response =
-        await fetch(apiURL, {
-            headers: {
-                "Accept":
-                    "application/vnd.github+json"
-            }
-        });
+    const response = await fetch(apiURL, {
+        headers: {
+            "Accept":
+                "application/vnd.github+json"
+        }
+    });
 
     if (!response.ok) {
-
         throw new Error(
             `GitHub API returned ${response.status}`
         );
     }
 
-    const files =
-        await response.json();
+    const files = await response.json();
 
     return files
         .filter(file =>
             file.type === "file" &&
-            file.name
-                .toLowerCase()
-                .endsWith(".nes")
+            file.name.toLowerCase().endsWith(".nes")
         )
         .map(file => ({
             filename: file.name,
@@ -180,81 +136,47 @@ async function findGames() {
 
 function createGameCard(game) {
 
-    const card =
-        document.createElement("div");
+    const card = document.createElement("div");
 
-    card.className =
-        "game-card";
+    card.className = "game-card";
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
 
-    card.setAttribute(
-        "role",
-        "button"
-    );
+    const image = document.createElement("img");
 
-    card.setAttribute(
-        "tabindex",
-        "0"
-    );
+    image.className = "game-image";
+    image.alt = game.name;
+    image.loading = "lazy";
+    image.src = game.imageURL;
 
+    image.onerror = function () {
+        this.style.display = "none";
+    };
 
-    const image =
-        document.createElement("img");
+    const name = document.createElement("div");
 
-    image.className =
-        "game-image";
-
-    image.alt =
-        game.name;
-
-    image.loading =
-        "lazy";
-
-    image.src =
-        game.imageURL;
-
-    image.onerror =
-        function () {
-            this.style.display =
-                "none";
-        };
-
-
-    const name =
-        document.createElement("div");
-
-    name.className =
-        "game-name";
-
-    name.textContent =
-        game.name;
-
+    name.className = "game-name";
+    name.textContent = game.name;
 
     card.appendChild(image);
     card.appendChild(name);
 
+    card.addEventListener("click", () => {
+        startGame(game);
+    });
 
-    card.addEventListener(
-        "click",
-        () => startGame(game)
-    );
+    card.addEventListener("keydown", event => {
 
+        if (
+            event.key === "Enter" ||
+            event.key === " "
+        ) {
 
-    card.addEventListener(
-        "keydown",
-        event => {
-
-            if (
-                event.key === "Enter" ||
-                event.key === " "
-            ) {
-
-                event.preventDefault();
-
-                startGame(game);
-            }
+            event.preventDefault();
+            startGame(game);
         }
-    );
 
+    });
 
     return card;
 }
@@ -279,9 +201,7 @@ function displayGames(games) {
         noResults.textContent =
             "No games found.";
 
-        gameList.appendChild(
-            noResults
-        );
+        gameList.appendChild(noResults);
 
         gameStatus.style.display =
             "none";
@@ -292,10 +212,8 @@ function displayGames(games) {
     gameStatus.style.display =
         "none";
 
-
     const fragment =
         document.createDocumentFragment();
-
 
     games.forEach(game => {
 
@@ -305,10 +223,7 @@ function displayGames(games) {
 
     });
 
-
-    gameList.appendChild(
-        fragment
-    );
+    gameList.appendChild(fragment);
 }
 
 
@@ -325,83 +240,125 @@ gameSearch.addEventListener(
                 .trim()
                 .toUpperCase();
 
-
         if (!search) {
-
-            displayGames(
-                allGames
-            );
-
+            displayGames(allGames);
             return;
         }
-
 
         const filtered =
             allGames.filter(game =>
                 game.name.includes(search)
             );
 
-
-        displayGames(
-            filtered
-        );
+        displayGames(filtered);
     }
 );
 
 
 /* ==========================================
-   COMPLETELY DESTROY EMULATOR
+   STOP EMULATOR
    ========================================== */
 
 function stopGame() {
 
     /*
-     * Invalidate all previous loading operations.
+     * Invalidate any pending game load.
      */
     gameLoadId++;
 
 
     /*
-     * IMPORTANT:
+     * EmulatorJS exposes its player through
+     * EJS_emulator when it has initialized.
      *
-     * Removing the iframe completely destroys
-     * the browsing context containing EmulatorJS.
-     *
-     * This stops its JavaScript, WebAssembly,
-     * audio and animation loops.
+     * Try its shutdown methods if available.
      */
-    emulatorFrame.src =
-        "about:blank";
+    try {
 
-    emulatorFrame.remove();
+        if (
+            window.EJS_emulator &&
+            typeof window.EJS_emulator.exit === "function"
+        ) {
+
+            window.EJS_emulator.exit();
+        }
+
+    } catch (error) {
+
+        console.warn(
+            "EmulatorJS exit warning:",
+            error
+        );
+    }
+
+
+    try {
+
+        if (
+            window.EJS_emulator &&
+            typeof window.EJS_emulator.stop === "function"
+        ) {
+
+            window.EJS_emulator.stop();
+        }
+
+    } catch (error) {
+
+        console.warn(
+            "EmulatorJS stop warning:",
+            error
+        );
+    }
 
 
     /*
-     * Create a brand-new iframe for the next game.
+     * Remove the emulator DOM.
      */
-    const newFrame =
-        document.createElement("iframe");
-
-    newFrame.id =
-        "emulator-frame";
-
-    newFrame.title =
-        "NES Emulator";
-
-    newFrame.allow =
-        "autoplay; fullscreen";
-
-    nesContainer.insertBefore(
-        newFrame,
-        gameLoading
-    );
+    gameContainer.innerHTML = "";
 
 
     /*
-     * Update our reference.
+     * Remove dynamically loaded EmulatorJS
+     * script.
      */
-    window.emulatorFrame =
-        newFrame;
+    document
+        .querySelectorAll(
+            'script[data-emulatorjs-loader="true"]'
+        )
+        .forEach(script => {
+            script.remove();
+        });
+
+
+    /*
+     * Clear EmulatorJS globals.
+     */
+    try {
+
+        delete window.EJS_player;
+        delete window.EJS_gameName;
+        delete window.EJS_gameUrl;
+        delete window.EJS_core;
+        delete window.EJS_biosUrl;
+        delete window.EJS_pathtodata;
+        delete window.EJS_startOnLoaded;
+        delete window.EJS_askBeforeExit;
+        delete window.EJS_onExit;
+
+    } catch (error) {
+
+        console.warn(
+            "Could not clear EmulatorJS settings:",
+            error
+        );
+    }
+
+
+    /*
+     * Reset the loading message.
+     */
+    gameLoading.style.display =
+        "none";
 }
 
 
@@ -411,15 +368,10 @@ function stopGame() {
 
 function startGame(game) {
 
-    /*
-     * Kill any previous emulator first.
-     */
     stopGame();
-
 
     const thisLoadId =
         gameLoadId;
-
 
     gameListScreen.style.display =
         "none";
@@ -427,17 +379,14 @@ function startGame(game) {
     gameScreen.style.display =
         "block";
 
-
     gameTitle.textContent =
         game.name;
-
 
     gameLoading.textContent =
         `Loading ${game.name}...`;
 
     gameLoading.style.display =
         "flex";
-
 
     window.scrollTo({
         top: 0,
@@ -448,12 +397,10 @@ function startGame(game) {
     setTimeout(() => {
 
         if (
-            thisLoadId !==
-            gameLoadId
+            thisLoadId !== gameLoadId
         ) {
             return;
         }
-
 
         loadEmulator(
             game,
@@ -473,144 +420,111 @@ function loadEmulator(
     thisLoadId
 ) {
 
-    /*
-     * Get the current iframe.
-     */
-    const frame =
-        document.getElementById(
-            "emulator-frame"
-        );
+    window.EJS_player =
+        "#game";
 
+    window.EJS_gameName =
+        game.name;
 
-    if (!frame) {
-        return;
-    }
-
+    window.EJS_gameUrl =
+        game.romURL;
 
     /*
-     * Put a complete HTML document inside
-     * the iframe.
-
-     * This isolates EmulatorJS from the main
-     * game-library page.
+     * Nestopia.
      */
-    const emulatorHTML = `
-<!DOCTYPE html>
-<html>
-<head>
+    window.EJS_core =
+        "nestopia";
 
-<meta charset="UTF-8">
+    window.EJS_biosUrl =
+        "";
 
-<meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
->
+    window.EJS_pathtodata =
+        EMULATOR_DATA_PATH;
 
-<style>
+    window.EJS_startOnLoaded =
+        true;
 
-html,
-body {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    background: black;
-}
-
-#game {
-    width: 100%;
-    height: 100%;
-}
-
-</style>
-
-</head>
-
-<body>
-
-<div id="game"></div>
-
-<script>
-
-window.EJS_player = "#game";
-
-window.EJS_gameName =
-    ${JSON.stringify(game.name)};
-
-window.EJS_gameUrl =
-    ${JSON.stringify(game.romURL)};
-
-window.EJS_core =
-    "nestopia";
-
-window.EJS_biosUrl =
-    "";
-
-window.EJS_pathtodata =
-    ${JSON.stringify(EMULATOR_DATA_PATH)};
-
-window.EJS_startOnLoaded =
-    true;
-
-window.EJS_askBeforeExit =
-    false;
-
-<\/script>
-
-<script
-    src="${EMULATOR_DATA_PATH}loader.js"
-><\/script>
-
-</body>
-</html>
-`;
+    window.EJS_askBeforeExit =
+        false;
 
 
-    /*
-     * Write the emulator page into the iframe.
-     */
-    frame.srcdoc =
-        emulatorHTML;
-
-
-    /*
-     * Once the iframe loads, remove our loading
-     * overlay after EmulatorJS has had time to
-     * initialize.
-     */
-    frame.addEventListener(
-        "load",
-        () => {
+    window.EJS_onExit =
+        function () {
 
             if (
-                thisLoadId !==
-                gameLoadId
+                thisLoadId !== gameLoadId
             ) {
                 return;
             }
 
+            gameContainer.innerHTML = "";
 
+        };
+
+
+    const script =
+        document.createElement("script");
+
+    script.src =
+        `${EMULATOR_DATA_PATH}loader.js`;
+
+    script.async =
+        true;
+
+    script.dataset.emulatorjsLoader =
+        "true";
+
+
+    script.onerror =
+        function () {
+
+            if (
+                thisLoadId !== gameLoadId
+            ) {
+                return;
+            }
+
+            gameLoading.textContent =
+                "EmulatorJS could not be loaded.";
+
+            gameLoading.style.display =
+                "flex";
+
+            console.error(
+                "Could not load EmulatorJS:",
+                script.src
+            );
+        };
+
+
+    script.onload =
+        function () {
+
+            if (
+                thisLoadId !== gameLoadId
+            ) {
+                return;
+            }
+
+            /*
+             * Give the emulator time to initialize.
+             */
             setTimeout(() => {
 
                 if (
-                    thisLoadId !==
-                    gameLoadId
+                    thisLoadId !== gameLoadId
                 ) {
                     return;
                 }
 
-
                 gameLoading.style.display =
                     "none";
 
-            }, 1500);
+            }, 1000);
+        };
 
-        },
-        {
-            once: true
-        }
-    );
+
+    document.body.appendChild(script);
 }
 
 
@@ -623,12 +537,14 @@ backButton.addEventListener(
     () => {
 
         /*
-         * This completely destroys the iframe
-         * containing the emulator.
+         * Actually stop the emulator first.
          */
         stopGame();
 
 
+        /*
+         * Return to library.
+         */
         gameScreen.style.display =
             "none";
 
@@ -636,13 +552,12 @@ backButton.addEventListener(
             "block";
 
 
-        gameSearch.value =
-            "";
+        /*
+         * Reset search.
+         */
+        gameSearch.value = "";
 
-
-        displayGames(
-            allGames
-        );
+        displayGames(allGames);
 
 
         window.scrollTo({
@@ -654,7 +569,7 @@ backButton.addEventListener(
 
 
 /* ==========================================
-   LOAD GAME LIST
+   INITIALIZE
    ========================================== */
 
 async function loadGameList() {
@@ -667,14 +582,10 @@ async function loadGameList() {
         gameStatus.style.display =
             "block";
 
-
         allGames =
             await findGames();
 
-
-        if (
-            allGames.length === 0
-        ) {
+        if (allGames.length === 0) {
 
             gameStatus.textContent =
                 "No .nes games were found in the games folder.";
@@ -682,10 +593,7 @@ async function loadGameList() {
             return;
         }
 
-
-        displayGames(
-            allGames
-        );
+        displayGames(allGames);
 
     } catch (error) {
 
@@ -694,20 +602,14 @@ async function loadGameList() {
             error
         );
 
-
         gameStatus.innerHTML =
             `Could not load the game list.<br><br>
              <small>${error.message}</small>`;
-
 
         gameStatus.style.display =
             "block";
     }
 }
 
-
-/* ==========================================
-   START
-   ========================================== */
 
 loadGameList();
