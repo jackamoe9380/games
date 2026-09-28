@@ -250,17 +250,32 @@ function stopGame() {
     gameLoadId++;
 
     try {
+        const emulator = window.EJS_emulator;
+
         if (
-            window.EJS_emulator &&
-            window.EJS_emulator.functions &&
-            typeof window.EJS_emulator.functions.exit === "function"
+            emulator &&
+            emulator.functions &&
+            Array.isArray(emulator.functions.exit) &&
+            typeof emulator.functions.exit[0] === "function"
         ) {
-            // Use EmulatorJS's own Exit Emulation function
-            window.EJS_emulator.functions.exit();
+            emulator.functions.exit[0]();
         }
     } catch (error) {
-        console.error("EmulatorJS exit error:", error);
+        // EmulatorJS throws RuntimeError: Aborted(undefined)
+        // when Module.abort() shuts down the emulator.
+        if (
+            !String(error).includes("Aborted") &&
+            !String(error).includes("abort")
+        ) {
+            console.error("EmulatorJS exit error:", error);
+        }
     }
+
+    // Clear the emulator container after shutdown begins.
+    setTimeout(() => {
+        gameContainer.innerHTML = "";
+        gameLoading.style.display = "none";
+    }, 100);
 }
 
 /* ==========================================
@@ -447,33 +462,20 @@ function loadEmulator(
    BACK BUTTON
    ========================================== */
 
-backButton.addEventListener(
-    "click",
-    () => {
+backButton.addEventListener("click", () => {
+    stopGame();
 
-        stopGame();
+    gameScreen.style.display = "none";
+    gameListScreen.style.display = "block";
 
-        gameScreen.style.display =
-            "none";
+    gameSearch.value = "";
+    displayGames(allGames);
 
-        gameListScreen.style.display =
-            "block";
-
-        gameSearch.value =
-            "";
-
-        displayGames(
-            allGames
-        );
-
-        window.scrollTo({
-            top: 0,
-            behavior: "smooth"
-        });
-
-    }
-);
-
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+});
 
 /* ==========================================
    INITIALIZE
