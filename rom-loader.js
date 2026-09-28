@@ -249,35 +249,19 @@ gameSearch.addEventListener(
 function stopGame() {
     gameLoadId++;
 
-    // Find EmulatorJS's actual "Exit Emulation" button
-    const exitButton = document.querySelector(
-        '[data-id="exitEmulation"]'
-    );
-
-    if (exitButton) {
-        exitButton.click();
-        return;
-    }
-
-    // Fallback in case the button uses a different attribute
-    const buttons = document.querySelectorAll("button");
-
-    for (const button of buttons) {
-        const text = button.textContent.trim().toLowerCase();
-
+    try {
         if (
-            text === "exit emulation" ||
-            text === "exit"
+            window.EJS_emulator &&
+            window.EJS_emulator.functions &&
+            typeof window.EJS_emulator.functions.exit === "function"
         ) {
-            button.click();
-            return;
+            // Use EmulatorJS's own Exit Emulation function
+            window.EJS_emulator.functions.exit();
         }
+    } catch (error) {
+        console.error("EmulatorJS exit error:", error);
     }
-
-    // If the emulator isn't running, just clear the container.
-    gameContainer.innerHTML = "";
 }
-
 
 /* ==========================================
    START GAME
